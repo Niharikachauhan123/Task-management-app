@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>TaskFlow – Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body class="dashboard-body">
+
+<div class="layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon"><i class="fa-solid fa-list-check"></i></div>
+            <span class="brand-name">TaskFlow</span>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" onclick="showSection('dashboard')">
+                <i class="fa-solid fa-house"></i><span>Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" onclick="showSection('tasks')">
+                <i class="fa-solid fa-list-check"></i><span>My Tasks</span>
+            </a>
+            <a href="#" class="nav-item" onclick="showSection('addtask')">
+                <i class="fa-solid fa-circle-plus"></i><span>Add Task</span>
+            </a>
+            <a href="#" class="nav-item" onclick="showSection('analytics')">
+                <i class="fa-solid fa-chart-bar"></i><span>Analytics</span>
+            </a>
+        </nav>
+        <a href="/logout" class="logout-btn">
+            <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
+        </a>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="main-content">
+
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+                <h2 id="page-title">Dashboard</h2>
+            </div>
+            <div class="topbar-right">
+                <div class="notif-bell" onclick="toggleNotifications()">
+                    <i class="fa-solid fa-bell"></i>
+                    <span class="notif-badge" id="notif-count">0</span>
+                </div>
+                <div class="user-avatar">{{ username[0].upper() }}</div>
+                <span class="user-name">{{ username }}</span>
+            </div>
+        </header>
+
+        <!-- NOTIFICATIONS PANEL -->
+        <div class="notif-panel" id="notif-panel">
+            <div class="notif-header">
+                <h3>Notifications</h3>
+                <button onclick="clearNotifications()">Mark all as read</button>
+            </div>
+            <div id="notif-list"><p class="no-notif">No notifications yet</p></div>
+        </div>
+
+        <!-- DASHBOARD SECTION -->
+        <section id="section-dashboard" class="content-section active">
+            <div class="analytics-cards">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <p>TOTAL TASKS</p>
+                        <h1>{{ total_tasks }}</h1>
+                    </div>
+                    <div class="stat-icon blue"><i class="fa-solid fa-clipboard-list"></i></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <p>COMPLETED</p>
+                        <h1>{{ completed_tasks }}</h1>
+                    </div>
+                    <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <p>PENDING</p>
+                        <h1>{{ pending_tasks }}</h1>
+                    </div>
+                    <div class="stat-icon orange"><i class="fa-solid fa-clock"></i></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <p>COMPLETION</p>
+                        <h1>{{ completion_percentage }}%</h1>
+                    </div>
+                    <div class="stat-icon pink"><i class="fa-solid fa-chart-pie"></i></div>
+                </div>
+            </div>
+
+            <!-- TASK TABLE -->
+            <div class="table-card">
+                <div class="table-header">
+                    <h2>My Tasks</h2>
+                    <button class="btn-add" onclick="showSection('addtask')">
+                        <i class="fa-solid fa-plus"></i> Add Task
+                    </button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Description</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in tasks %}
+                            <tr>
+                                <td>{{ task.id }}</td>
+                                <td><strong>{{ task.title }}</strong></td>
+                                <td>{{ task.description }}</td>
+                                <td><span class="badge priority-{{ task.priority|lower }}">{{ task.priority }}</span></td>
+                                <td><span class="badge status-{{ task.status|lower }}">{{ task.status }}</span></td>
+                                <td class="action-btns">
+                                    <form action="/update-task/{{ task.id }}" method="POST" style="display:inline;">
+                                        <button class="icon-btn complete-btn" title="Mark Complete"><i class="fa-solid fa-check"></i></button>
+                                    </form>
+                                    <form action="/delete-task/{{ task.id }}" method="POST" style="display:inline;">
+                                        <button class="icon-btn delete-btn" title="Delete" onclick="return confirm('Delete this task?')"><i class="fa-solid fa-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" class="empty-table">No tasks yet. Add your first task!</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="table-footer">Showing {{ tasks|length }} task(s)</p>
+            </div>
+        </section>
+
+        <!-- MY TASKS SECTION -->
+        <section id="section-tasks" class="content-section">
+            <div class="table-card">
+                <div class="table-header">
+                    <h2>My Tasks</h2>
+                    <button class="btn-add" onclick="showSection('addtask')">
+                        <i class="fa-solid fa-plus"></i> Add Task
+                    </button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>ID</th><th>Title</th><th>Description</th><th>Priority</th><th>Status</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for task in tasks %}
+                            <tr>
+                                <td>{{ task.id }}</td>
+                                <td><strong>{{ task.title }}</strong></td>
+                                <td>{{ task.description }}</td>
+                                <td><span class="badge priority-{{ task.priority|lower }}">{{ task.priority }}</span></td>
+                                <td><span class="badge status-{{ task.status|lower }}">{{ task.status }}</span></td>
+                                <td class="action-btns">
+                                    <form action="/update-task/{{ task.id }}" method="POST" style="display:inline;">
+                                        <button class="icon-btn complete-btn" title="Mark Complete"><i class="fa-solid fa-check"></i></button>
+                                    </form>
+                                    <form action="/delete-task/{{ task.id }}" method="POST" style="display:inline;">
+                                        <button class="icon-btn delete-btn" title="Delete" onclick="return confirm('Delete this task?')"><i class="fa-solid fa-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" class="empty-table">No tasks yet!</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ADD TASK SECTION -->
+        <section id="section-addtask" class="content-section">
+            <div class="form-card">
+                <h2>Add New Task</h2>
+                <form action="/add-task" method="POST" class="task-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" name="title" placeholder="Enter task title" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea name="description" placeholder="Enter task description" required></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Priority</label>
+                            <select name="priority">
+                                <option value="High">High</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select name="status">
+                                <option value="Pending" selected>Pending</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-cancel" onclick="showSection('dashboard')">Cancel</button>
+                        <button type="submit" class="btn-primary">Add Task</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ANALYTICS SECTION -->
+        <section id="section-analytics" class="content-section">
+            <div class="analytics-cards">
+                <div class="stat-card">
+                    <div class="stat-info"><p>TOTAL TASKS</p><h1>{{ total_tasks }}</h1></div>
+                    <div class="stat-icon blue"><i class="fa-solid fa-clipboard-list"></i></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info"><p>COMPLETED</p><h1>{{ completed_tasks }}</h1></div>
+                    <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info"><p>PENDING</p><h1>{{ pending_tasks }}</h1></div>
+                    <div class="stat-icon orange"><i class="fa-solid fa-clock"></i></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info"><p>COMPLETION %</p><h1>{{ completion_percentage }}%</h1></div>
+                    <div class="stat-icon pink"><i class="fa-solid fa-chart-pie"></i></div>
+                </div>
+            </div>
+            <div class="analytics-detail">
+                <div class="progress-card">
+                    <h3>Task Completion Rate</h3>
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar" style="width: {{ completion_percentage }}%"></div>
+                    </div>
+                    <p>{{ completion_percentage }}% of tasks completed</p>
+                </div>
+            </div>
+        </section>
+
+    </div>
+</div>
+
+<!-- TOAST NOTIFICATION -->
+<div class="toast" id="toast">
+    <i class="fa-solid fa-circle-check"></i>
+    <span id="toast-msg"></span>
+</div>
+
+<script>
+const socket = io();
+let notifCount = 0;
+const notifications = [];
+
+socket.on("task_notification", function(data) {
+    notifications.unshift(data.message);
+    notifCount++;
+    document.getElementById('notif-count').textContent = notifCount;
+    renderNotifications();
+    showToast(data.message);
+});
+
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    document.getElementById('toast-msg').textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function showSection(name) {
+    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('section-' + name).classList.add('active');
+    const titles = {dashboard: 'Dashboard', tasks: 'My Tasks', addtask: 'Add Task', analytics: 'Analytics'};
+    document.getElementById('page-title').textContent = titles[name];
+    const navMap = {dashboard: 0, tasks: 1, addtask: 2, analytics: 3};
+    document.querySelectorAll('.nav-item')[navMap[name]].classList.add('active');
+}
+
+function toggleNotifications() {
+    document.getElementById('notif-panel').classList.toggle('open');
+}
+
+function clearNotifications() {
+    notifications.length = 0;
+    notifCount = 0;
+    document.getElementById('notif-count').textContent = 0;
+    renderNotifications();
+    document.getElementById('notif-panel').classList.remove('open');
+}
+
+function renderNotifications() {
+    const list = document.getElementById('notif-list');
+    if (notifications.length === 0) {
+        list.innerHTML = '<p class="no-notif">No notifications yet</p>';
+    } else {
+        list.innerHTML = notifications.map(n => `<div class="notif-item"><i class="fa-solid fa-circle-dot"></i><span>${n}</span></div>`).join('');
+    }
+}
+
+function toggleSidebar() {
+    document.querySelector('.sidebar').classList.toggle('open');
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.notif-bell') && !e.target.closest('.notif-panel')) {
+        document.getElementById('notif-panel').classList.remove('open');
+    }
+});
+</script>
+</body>
+</html>
