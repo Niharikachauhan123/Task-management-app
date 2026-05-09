@@ -208,5 +208,5 @@ Metrics displayed:
 ## 👩‍💻 Author
 
 **Niharika Chauhan**
-Python Development Internship — Sankar Group
+
 
